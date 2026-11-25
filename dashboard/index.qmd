@@ -1,0 +1,162 @@
+---
+title: "Respiratory virus surveillance, Canada"
+format:
+  dashboard:
+    embed-resources: true
+    theme: cosmo
+    scrolling: true
+execute:
+  echo: false
+  warning: false
+---
+
+```{r}
+#| include: false
+library(DBI)
+library(ggplot2)
+
+con <- DBI::dbConnect(odbc::odbc(), .connection_string = Sys.getenv("RSW_CONNECTION"))
+canada <- DBI::dbGetQuery(con, "
+  SELECT WeekEndDate, VirusName, Tests, Detections, PercentPositive
+  FROM rpt.vw_WeeklyPositivity
+  WHERE GeographyName = N'Canada'
+    AND SeasonLabel = (SELECT MAX(SeasonLabel) FROM dim.SurveillanceWeek)")
+latest <- DBI::dbGetQuery(con, "SELECT * FROM rpt.vw_LatestWeek")
+season <- DBI::dbGetQuery(con, "SELECT * FROM rpt.vw_SeasonComparison")
+status <- DBI::dbGetQuery(con, "SELECT * FROM rpt.vw_LoadStatus")
+current_season <- DBI::dbGetQuery(con, "SELECT MAX(SeasonLabel) AS s FROM dim.SurveillanceWeek")$s
+DBI::dbDisconnect(con)
+
+canada$WeekEndDate <- as.Date(canada$WeekEndDate)
+latest$WeekEndDate <- as.Date(latest$WeekEndDate)
+
+key_viruses <- c("SARS-CoV-2", "Influenza", "RSV")
+virus_labels <- c("SARS-CoV-2" = "COVID-19 (SARS-CoV-2)", "Influenza" = "Influenza", "RSV" = "RSV")
+# Okabe-Ito colours: distinguishable with common colour vision deficiencies.
+virus_colours <- c("SARS-CoV-2" = "#0072B2", "Influenza" = "#D55E00", "RSV" = "#009E73")
+
+latest_week <- max(latest$WeekEndDate)
+fmt_pct <- function(x) ifelse(is.na(x), "n/a", sprintf("%.1f%%", x))
+fmt_change <- function(x) {
+  ifelse(is.na(x), "no prior week",
+         ifelse(x > 0, sprintf("up %.1f points", x),
+                ifelse(x < 0, sprintf("down %.1f points", abs(x)), "no change")))
+}
+canada_latest <- function(virus) latest[latest$GeographyName == "Canada" & latest$VirusName == virus, ]
+box_title <- function(virus) {
+  row <- canada_latest(virus)
+  sprintf("%s positivity, Canada (%s)", virus_labels[[virus]], fmt_change(row$ChangePoints))
+}
+```
+
+## Row {height=18%}
+
+```{r}
+#| content: valuebox
+#| title: !expr box_title("SARS-CoV-2")
+list(value = fmt_pct(canada_latest("SARS-CoV-2")$PercentPositive), color = "light")
+```
+
+```{r}
+#| content: valuebox
+#| title: !expr box_title("Influenza")
+list(value = fmt_pct(canada_latest("Influenza")$PercentPositive), color = "light")
+```
+
+```{r}
+#| content: valuebox
+#| title: !expr box_title("RSV")
+list(value = fmt_pct(canada_latest("RSV")$PercentPositive), color = "light")
+```
+
+```{r}
+#| content: valuebox
+#| title: "Latest surveillance week ending"
+list(value = format(latest_week, "%B %d, %Y"), color = "light")
+```
+
+## Row {height=45%}
+
+```{r}
+#| title: !expr paste0("Percent of tests positive by week, Canada, ", current_season, " season")
+plot_data <- canada[canada$VirusName %in% key_viruses, ]
+ggplot(plot_data, aes(WeekEndDate, PercentPositive, colour = VirusName)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.6) +
+  scale_colour_manual(values = virus_colours, labels = virus_labels, name = NULL) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), limits = c(0, NA)) +
+  scale_x_date(date_labels = "%b %d") +
+  labs(x = "Week ending", y = "Tests positive") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+```
+
+```{r}
+#| title: "This season compared with previous seasons, Canada"
+cmp <- season[season$VirusName %in% key_viruses, ]
+cmp$VirusName <- factor(cmp$VirusName, levels = key_viruses, labels = virus_labels[key_viruses])
+range_rows <- cmp[cmp$SeriesName %in% c("Pre-pandemic minimum", "Pre-pandemic maximum"), ]
+ribbon <- if (nrow(range_rows) > 0) {
+  stats::reshape(range_rows[, c("VirusName", "SeasonWeekOrder", "SeriesName", "PercentPositive")],
+                 idvar = c("VirusName", "SeasonWeekOrder"), timevar = "SeriesName", direction = "wide")
+} else NULL
+past <- cmp[!cmp$IsCurrentSeason & grepl("^\\d{4}-\\d{4}$", cmp$SeriesName), ]
+now <- cmp[cmp$IsCurrentSeason, ]
+
+p <- ggplot() +
+  geom_line(data = past, aes(SeasonWeekOrder, PercentPositive, group = SeriesName),
+            colour = "grey70", linewidth = 0.5)
+if (!is.null(ribbon) && all(c("PercentPositive.Pre-pandemic minimum", "PercentPositive.Pre-pandemic maximum") %in% names(ribbon))) {
+  p <- p + geom_ribbon(data = ribbon,
+                       aes(SeasonWeekOrder,
+                           ymin = `PercentPositive.Pre-pandemic minimum`,
+                           ymax = `PercentPositive.Pre-pandemic maximum`),
+                       fill = "grey50", alpha = 0.15)
+}
+p +
+  geom_line(data = now, aes(SeasonWeekOrder, PercentPositive), colour = "#0072B2", linewidth = 1.2) +
+  facet_wrap(~VirusName, nrow = 1, scales = "free_y") +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), limits = c(0, NA)) +
+  labs(x = "Week of season (week 1 is late August)", y = "Tests positive",
+       caption = paste0("Blue: ", current_season, ". Grey lines: previous seasons. ",
+                        "Shaded band: pre-pandemic range, where available.")) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(), plot.caption = element_text(hjust = 0))
+```
+
+## Row
+
+```{r}
+#| title: !expr paste("Latest week by province, territory and region, week ending", format(latest_week, "%B %d, %Y"))
+tab <- latest[latest$VirusName %in% key_viruses, c("GeographyName", "GeographyLevel", "RegionName", "VirusName", "Tests", "PercentPositive")]
+wide <- stats::reshape(tab[, c("GeographyName", "GeographyLevel", "RegionName", "VirusName", "PercentPositive")],
+                       idvar = c("GeographyName", "GeographyLevel", "RegionName"),
+                       timevar = "VirusName", direction = "wide")
+level_order <- c("Country" = 1, "Region" = 2, "Province/Territory" = 3)
+wide <- wide[order(level_order[wide$GeographyLevel], wide$RegionName, wide$GeographyName), ]
+out <- data.frame(
+  Geography = wide$GeographyName,
+  Level = wide$GeographyLevel,
+  check.names = FALSE
+)
+for (v in key_viruses) {
+  col <- paste0("PercentPositive.", v)
+  out[[virus_labels[[v]]]] <- if (col %in% names(wide)) fmt_pct(wide[[col]]) else "n/a"
+}
+knitr::kable(out, row.names = FALSE, align = c("l", "l", rep("r", length(key_viruses))))
+```
+
+```{r}
+#| title: "About this dashboard"
+#| output: asis
+cat(sprintf(paste(
+  "Source: Public Health Agency of Canada, Respiratory Virus Detection Surveillance System (RVDSS),",
+  "published on Health Infobase. Contains information licensed under the Open Government Licence - Canada.\n\n",
+  "RVDSS is a sentinel laboratory system and does not capture all respiratory virus testing in Canada.",
+  "Recent weeks may be revised as late results arrive; the warehouse updates revised counts in place.\n\n",
+  "Source last updated: %s. Warehouse loaded: %s UTC (%d rows: %d new, %d revised).\n\n",
+  "Built with R, SQL Server and Quarto. Code: github.com/rtwarren/Respiratory-Surveillance-Warehouse"),
+  format(as.POSIXct(status$SourceUpdated), "%Y-%m-%d %H:%M"),
+  format(as.POSIXct(status$CompletedAt), "%Y-%m-%d %H:%M"),
+  status$RowsWeekly, status$Inserted, status$Updated))
+```
