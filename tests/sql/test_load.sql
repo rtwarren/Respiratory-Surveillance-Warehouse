@@ -4,6 +4,8 @@
   Any failed assertion raises an error, which fails the job (sqlcmd -b).
 */
 SET NOCOUNT ON;
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 
 DECLARE @stage nvarchar(20) = N'$(Stage)';
 DECLARE @msg nvarchar(400);
