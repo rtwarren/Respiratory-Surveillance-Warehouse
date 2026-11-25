@@ -1,0 +1,31 @@
+region,province,week,weekorder,year,date,virus,tests,detections,percentpositive
+Canada,Canada,51,17,2026,2026-12-19,SARS-CoV-2,30120,1506,5.0
+Canada,Canada,52,18,2026,2026-12-26,SARS-CoV-2,28890,1300,4.5
+Canada,Canada,1,19,2027,2027-01-02,SARS-CoV-2,31010,1240,4.0
+Canada,Canada,51,17,2026,2026-12-19,Influenza,29800,3576,12.0
+Canada,Canada,52,18,2026,2026-12-26,Influenza,30500,4880,16.0
+Canada,Canada,1,19,2027,2027-01-02,Influenza,33200,6308,19.0
+Canada,Canada,51,17,2026,2026-12-19,Influenza A,29800,3420,11.5
+Canada,Canada,52,18,2026,2026-12-26,Influenza A,30500,4697,15.4
+Canada,Canada,1,19,2027,2027-01-02,Influenza A,33200,6075,18.3
+Canada,Canada,51,17,2026,2026-12-19,RSV,25400,1778,7.0
+Canada,Canada,52,18,2026,2026-12-26,RSV,26100,2088,8.0
+Canada,Canada,1,19,2027,2027-01-02,RSV,27400,2510,9.2
+Atlantic,Atlantic,51,17,2026,2026-12-19,SARS-CoV-2,2210,99,4.5
+Atlantic,Atlantic,52,18,2026,2026-12-26,SARS-CoV-2,2150,86,4.0
+Atlantic,Atlantic,1,19,2027,2027-01-02,SARS-CoV-2,2302,83,3.6
+Atlantic,Nova Scotia,51,17,2026,2026-12-19,SARS-CoV-2,980,44,4.5
+Atlantic,Nova Scotia,52,18,2026,2026-12-26,SARS-CoV-2,940,38,4.0
+Atlantic,Nova Scotia,1,19,2027,2027-01-02,SARS-CoV-2,1012,35,3.5
+Atlantic,Nova Scotia,51,17,2026,2026-12-19,RSV,870,61,7.0
+Atlantic,Nova Scotia,52,18,2026,2026-12-26,RSV,905,72,8.0
+Atlantic,Nova Scotia,1,19,2027,2027-01-02,RSV,930,84,9.0
+Territories,Territories,51,17,2026,2026-12-19,SARS-CoV-2,310,12,3.9
+Territories,Territories,52,18,2026,2026-12-26,SARS-CoV-2,295,9,3.1
+Territories,Territories,1,19,2027,2027-01-02,SARS-CoV-2,330,11,3.3
+Territories,Territories,51,17,2026,2026-12-19,HPIV,120,2,1.7
+Territories,Territories,52,18,2026,2026-12-26,HPIV,N/A,N/A,N/A
+Territories,Territories,1,19,2027,2027-01-02,HPIV,118,1,0.8
+Territories,Northwest Territories,51,17,2026,2026-12-19,SARS-CoV-2,140,6,4.3
+Territories,Northwest Territories,52,18,2026,2026-12-26,SARS-CoV-2,132,4,3.0
+Territories,Northwest Territories,1,19,2027,2027-01-02,SARS-CoV-2,151,5,3.3
