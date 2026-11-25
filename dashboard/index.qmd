@@ -38,9 +38,10 @@ virus_colours <- c("SARS-CoV-2" = "#0072B2", "Influenza" = "#D55E00", "RSV" = "#
 latest_week <- max(latest$WeekEndDate)
 fmt_pct <- function(x) ifelse(is.na(x), "n/a", sprintf("%.1f%%", x))
 fmt_change <- function(x) {
+  # Changes that round to 0.0 read as "no change" rather than "down 0.0 points".
   ifelse(is.na(x), "no prior week",
-         ifelse(x > 0, sprintf("up %.1f points", x),
-                ifelse(x < 0, sprintf("down %.1f points", abs(x)), "no change")))
+         ifelse(x >= 0.05, sprintf("up %.1f points", x),
+                ifelse(x <= -0.05, sprintf("down %.1f points", abs(x)), "no change")))
 }
 canada_latest <- function(virus) latest[latest$GeographyName == "Canada" & latest$VirusName == virus, ]
 box_title <- function(virus) {
