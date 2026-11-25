@@ -2,6 +2,8 @@
   Reporting views. The dashboard reads only from the rpt schema.
 */
 SET NOCOUNT ON;
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 GO
 
 CREATE OR ALTER VIEW rpt.vw_WeeklyPositivity

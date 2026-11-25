@@ -11,6 +11,8 @@
   Called by the R loader inside its transaction.
 */
 SET NOCOUNT ON;
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 GO
 
 CREATE OR ALTER PROCEDURE etl.usp_LoadRVD
