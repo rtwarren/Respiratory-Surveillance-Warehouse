@@ -1,0 +1,139 @@
+name: CI and dashboard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Fridays 14:17 UTC, after the weekly source update.
+    - cron: "17 14 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  SA_PASSWORD: Ci_Only_Passw0rd!
+
+jobs:
+  unit-tests:
+    name: R unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Run testthat
+        run: Rscript -e 'testthat::test_dir("tests/testthat", reporter = "summary", stop_on_failure = TRUE)'
+
+  build:
+    name: Load warehouse and build dashboard
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Ci_Only_Passw0rd!
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Microsoft ODBC Driver 18
+        run: |
+          if ! odbcinst -q -d 2>/dev/null | grep -q "ODBC Driver 18 for SQL Server"; then
+            curl -sSL -O "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+            sudo dpkg -i packages-microsoft-prod.deb
+            sudo apt-get update
+            sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+          fi
+          sudo apt-get install -y unixodbc-dev
+          odbcinst -q -d
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Configure sqlcmd
+        run: echo "SQLCMD=docker exec -i ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $SA_PASSWORD -C -b" >> "$GITHUB_ENV"
+
+      - name: Wait for SQL Server
+        run: |
+          for i in $(seq 1 30); do
+            if $SQLCMD -Q "SELECT 1" > /dev/null 2>&1; then echo "ready"; exit 0; fi
+            sleep 2
+          done
+          echo "SQL Server did not start"; exit 1
+
+      - name: Create test and live databases
+        run: |
+          for db in RSW_Test RSW; do
+            $SQLCMD -Q "CREATE DATABASE $db;"
+            for f in sql/01_schema.sql sql/02_procedures.sql sql/03_rpt_views.sql; do
+              $SQLCMD -d $db < "$f"
+            done
+          done
+
+      - name: "Integration test: initial load of fixtures"
+        env:
+          RSW_CONNECTION: "Driver={ODBC Driver 18 for SQL Server};Server=localhost,1433;Database=RSW_Test;UID=sa;PWD=${{ env.SA_PASSWORD }};TrustServerCertificate=yes;"
+        run: |
+          Rscript run_etl.R --source-dir tests/fixtures
+          $SQLCMD -d RSW_Test -v Stage=initial < tests/sql/test_load.sql
+
+      - name: "Integration test: reloading the same files changes nothing"
+        env:
+          RSW_CONNECTION: "Driver={ODBC Driver 18 for SQL Server};Server=localhost,1433;Database=RSW_Test;UID=sa;PWD=${{ env.SA_PASSWORD }};TrustServerCertificate=yes;"
+        run: |
+          Rscript run_etl.R --source-dir tests/fixtures
+          $SQLCMD -d RSW_Test -v Stage=rerun < tests/sql/test_load.sql
+
+      - name: "Integration test: revised counts are applied"
+        env:
+          RSW_CONNECTION: "Driver={ODBC Driver 18 for SQL Server};Server=localhost,1433;Database=RSW_Test;UID=sa;PWD=${{ env.SA_PASSWORD }};TrustServerCertificate=yes;"
+        run: |
+          Rscript run_etl.R --source-dir tests/fixtures/revision
+          $SQLCMD -d RSW_Test -v Stage=revision < tests/sql/test_load.sql
+
+      - name: Load live data from Health Infobase
+        env:
+          RSW_CONNECTION: "Driver={ODBC Driver 18 for SQL Server};Server=localhost,1433;Database=RSW;UID=sa;PWD=${{ env.SA_PASSWORD }};TrustServerCertificate=yes;"
+        run: Rscript run_etl.R
+
+      - name: Render dashboard
+        env:
+          RSW_CONNECTION: "Driver={ODBC Driver 18 for SQL Server};Server=localhost,1433;Database=RSW;UID=sa;PWD=${{ env.SA_PASSWORD }};TrustServerCertificate=yes;"
+        run: |
+          quarto render dashboard/index.qmd
+          mkdir -p _site
+          cp dashboard/index.html _site/index.html
+
+      - name: Upload dashboard
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
