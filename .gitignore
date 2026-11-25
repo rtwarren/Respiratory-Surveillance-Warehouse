@@ -1,0 +1,9 @@
+.Rhistory
+.RData
+.Rproj.user/
+_site/
+dashboard/index.html
+dashboard/index_files/
+dashboard/.quarto/
+.quarto/
+.env

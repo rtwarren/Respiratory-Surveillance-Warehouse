@@ -1,0 +1,22 @@
+Package: RespiratorySurveillanceWarehouse
+Title: Respiratory Virus Surveillance Warehouse and Dashboard
+Version: 0.1.0
+Authors@R: person("Rob", "Warren", role = c("aut", "cre"))
+Description: R ETL that loads Public Health Agency of Canada respiratory virus
+    detection data into a SQL Server star schema, with a Quarto dashboard built
+    from the reporting views. Not an installable package; this file declares
+    dependencies for CI.
+License: MIT
+Encoding: UTF-8
+Imports:
+    DBI,
+    odbc,
+    readr,
+    dplyr,
+    tidyr,
+    ggplot2,
+    scales,
+    knitr,
+    rmarkdown
+Suggests:
+    testthat (>= 3.0.0)
