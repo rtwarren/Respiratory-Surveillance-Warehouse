@@ -67,7 +67,7 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Configure sqlcmd
-        run: echo "SQLCMD=docker exec -i ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $SA_PASSWORD -C -b" >> "$GITHUB_ENV"
+        run: echo "SQLCMD=docker exec -i ${{ job.services.mssql.id }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $SA_PASSWORD -C -b -I" >> "$GITHUB_ENV"
 
       - name: Wait for SQL Server
         run: |
